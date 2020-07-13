@@ -100,6 +100,7 @@ Game类：
 Game：游戏的核心类，储存多个GameObject，处理游戏的渲染、输入等  
 GameObjectWithTexture：一个显示出贴图的预制GameObject  
 GameObject：最基本的类，游戏主要的逻辑处理
+
 ---
 新建类GameObject，所有的游戏物体都会继承此类
 
