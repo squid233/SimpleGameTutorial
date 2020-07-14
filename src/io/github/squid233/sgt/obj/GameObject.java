@@ -32,8 +32,7 @@ public class GameObject {
      * 移动指定偏移坐标
      */
     public void transfer(int x, int y) {
-        this.x += x;
-        this.y += y;
+        setPosition(getX() + x, getY() + y);
     }
 
     public int getX() {
@@ -52,4 +51,11 @@ public class GameObject {
         this.y = y;
     }
 
+
+    /**
+     * 在游戏的每帧被调用
+     */
+    public void onTick() {
+
+    }
 }

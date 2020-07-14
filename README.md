@@ -246,3 +246,186 @@ GameObject：最基本的类，游戏主要的逻辑处理
 
 因为窗口的状态被改变了，系统就通知窗口重画了一遍，所以GameObjectWithTexture显示了出来  
 显然游戏不能这样，这是下一章里要解决的
+
+## 第三章：渲染线程/让Creeper动起来
+
+针对上次的只有更新窗口时画面才会重画，解决方法很简单：  
+只需要新建一个线程，隔一段时间就通知游戏窗口重画，不停的在窗口上重画，看起来就好像是动态的画面，实质上只是静态的图片。
+
+隔多久呢？  
+一般的2D游戏的帧数在20-30fps左右。
+
+什么是帧/FPS：  
+**帧(Frame)**：画在游戏窗口上的一张静态图  
+**帧速率(FPS/帧数)**：静态图片更新速度的快慢（FPS = 1秒 / 1秒内渲染的帧数）
+
+---
+首先修改Game类，添加以下代码：
+
+    //.....
+    /**
+     * 游戏的FPS
+     */
+    private int fps;
+    //.....
+
+    //.....
+
+    /**
+     * 退出游戏
+     */
+    public void exit() {
+        System.exit(-1);
+    }
+
+    /**
+     * 返回游戏的FPS
+     */
+    public int getFps() {
+        return fps;
+    }
+
+    /**
+     * 设置游戏的FPS
+     *
+     * @param fps 新FPS
+     * @return 是否设置成功
+     */
+    public boolean setFps(int fps) {
+        if (fps <= 0) {
+            return false;
+        } else {
+            this.fps = fps;
+            return true;
+        }
+    }
+    //.....
+
+新建类RenderThread，用来定时重画窗口：
+
+    package io.github.squid233.sgt.engine;
+    
+    /**
+     * @author squid233
+     */
+    public class RenderThread implements Runnable {
+        private Thread thread;
+        /** 游戏是否退出 */
+        private boolean exited = false;
+        /** 每次绘制隔多久 */
+        private final int interval;
+        public Game game;
+    
+        public RenderThread(Game g) {
+            game = g;
+            //计算出隔多久重画一次(毫秒)
+            interval = 1000 / game.getFps();
+            System.out.println("[RenderThread]Created");
+            System.out.println("[RenderThread]Render interval: " + interval + " ms");
+        }
+    
+        @Override
+        public void run() {
+            System.out.println(thread.getName() + "Start rendering");
+            while (!exited) {
+                game.repaint();//通知游戏窗口重画
+                try {
+                    //间隔一定时间渲染一次，来实现稳定fps
+                    Thread.sleep(interval);
+                } catch (Exception e) {
+                    System.out.println(thread.getName() + "Error: " + e.toString());
+                    exited = true;
+                }
+            }
+            System.out.println(thread.getName() + "Stop rendering");
+            game.exit();
+        }
+    
+        public void start() {
+            if (thread == null) {
+                thread = new Thread(this, "[RenderThread]");
+                thread.start();
+            }
+        }
+    
+    }
+
+在启动游戏的同时启动渲染线程：
+
+    public Game() {
+        setFps(30);
+        //初始化ArrayList
+        gameObjects = new ArrayList<>();
+        init();
+        //初始化线程
+        RenderThread render = new RenderThread(this);
+        //启动线程
+        render.start();
+    }
+
+启动游戏，看看效果：  
+![无需刷新](result-image/chenggongxianshi.png)
+
+可以看到不需要刷新窗口就能显示出来  
+下面让Creeper动起来，以便更好地观察效果
+
+---
+修改GameObject类，添加onTick方法，这个方法会在游戏渲染每一帧的时候被调用：
+
+    /**
+	 * 在游戏的每帧被调用
+	 */
+	public void onTick() {
+
+	}
+
+下面为了修改让这个方法有实际用途，创建类Creeper继承GameObjectWithTexture，就可以重写onTick方法：
+
+    package io.github.squid233.sgt.obj;
+    
+    /**
+     * @author squid233
+     */
+    public class Creeper extends GameObjectWithTexture {
+    
+        public Creeper(String filePath) {
+            super(filePath);
+        }
+    
+        @Override
+        public void onTick() {
+            //在当前位置的基础上向右移动1个单位长度
+            this.transfer(1, 0);
+        }
+    }
+
+修改Main方法：
+
+    Game game = new Game();
+    Creeper creeper = new Creeper("img/creeper.png");
+    creeper.setPosition(Game.BORDER_SIDE_SIZE, Game.BORDER_TOP_SIZE);
+    game.addGameObject(creeper);
+
+启动游戏，好像还是没效果？  
+![没效果](result-image/chenggongxianshi.png)
+
+因为onTick方法还没有被调用！  
+修改一下Game类，调用onTick方法：
+
+    /**
+     * 重写窗体绘制方法
+     * @param g graphics
+     */
+    @Override
+    public void paint(Graphics g) {
+        g.setColor(Color.BLACK);
+        g.fillRect(0, 0, getWidth(), getHeight());
+        //渲染所有的game object
+        for (GameObjectWithTexture gameObject : gameObjects) {
+            gameObject.onTick();
+            gameObject.draw(g);
+        }
+    }
+
+再运行一次就可以看到creeper移动了。  
+但是出现了闪烁现象，这是下一次要解决的。
